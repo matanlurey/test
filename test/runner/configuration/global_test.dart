@@ -6,21 +6,18 @@
 
 import 'dart:convert';
 
-import 'package:scheduled_test/descriptor.dart' as d;
-import 'package:scheduled_test/scheduled_stream.dart';
-import 'package:scheduled_test/scheduled_test.dart';
+import 'package:test/test.dart';
+import 'package:test_descriptor/test_descriptor.dart' as d;
 
 import 'package:test/src/util/exit_codes.dart' as exit_codes;
 
 import '../../io.dart';
 
 void main() {
-  useSandbox();
+  test("ignores an empty file", () async {
+    await d.file("global_test.yaml", "").create();
 
-  test("ignores an empty file", () {
-    d.file("global_test.yaml", "").create();
-
-    d.file("test.dart", """
+    await d.file("test.dart", """
       import 'package:test/test.dart';
 
       void main() {
@@ -28,19 +25,19 @@ void main() {
       }
     """).create();
 
-    var test = runTest(["test.dart"], environment: {
+    var test = await runTest(["test.dart"], environment: {
       "DART_TEST_CONFIG": "global_test.yaml"
     });
-    test.stdout.expect(consumeThrough(contains("+1: All tests passed!")));
-    test.shouldExit(0);
+    expect(test.stdout, emitsThrough(contains("+1: All tests passed!")));
+    await test.shouldExit(0);
   });
 
-  test("uses supported test configuration", () {
-    d.file("global_test.yaml", JSON.encode({
+  test("uses supported test configuration", () async {
+    await d.file("global_test.yaml", JSON.encode({
       "verbose_trace": true
     })).create();
 
-    d.file("test.dart", """
+    await d.file("test.dart", """
       import 'package:test/test.dart';
 
       void main() {
@@ -48,19 +45,19 @@ void main() {
       }
     """).create();
 
-    var test = runTest(["test.dart"], environment: {
+    var test = await runTest(["test.dart"], environment: {
       "DART_TEST_CONFIG": "global_test.yaml"
     });
-    test.stdout.expect(consumeThrough(contains("dart:isolate-patch")));
-    test.shouldExit(1);
+    expect(test.stdout, emitsThrough(contains("dart:isolate-patch")));
+    await test.shouldExit(1);
   });
 
-  test("uses supported runner configuration", () {
-    d.file("global_test.yaml", JSON.encode({
+  test("uses supported runner configuration", () async {
+    await d.file("global_test.yaml", JSON.encode({
       "reporter": "json"
     })).create();
 
-    d.file("test.dart", """
+    await d.file("test.dart", """
       import 'package:test/test.dart';
 
       void main() {
@@ -68,23 +65,23 @@ void main() {
       }
     """).create();
 
-    var test = runTest(["test.dart"], environment: {
+    var test = await runTest(["test.dart"], environment: {
       "DART_TEST_CONFIG": "global_test.yaml"
     });
-    test.stdout.expect(consumeThrough(contains('"testStart"')));
-    test.shouldExit(0);
+    expect(test.stdout, emitsThrough(contains('"testStart"')));
+    await test.shouldExit(0);
   });
 
-  test("local configuration takes precedence", () {
-    d.file("global_test.yaml", JSON.encode({
+  test("local configuration takes precedence", () async {
+    await d.file("global_test.yaml", JSON.encode({
       "verbose_trace": true
     })).create();
 
-    d.file("dart_test.yaml", JSON.encode({
+    await d.file("dart_test.yaml", JSON.encode({
       "verbose_trace": false
     })).create();
 
-    d.file("test.dart", """
+    await d.file("test.dart", """
       import 'package:test/test.dart';
 
       void main() {
@@ -92,21 +89,21 @@ void main() {
       }
     """).create();
 
-    var test = runTest(["test.dart"], environment: {
+    var test = await runTest(["test.dart"], environment: {
       "DART_TEST_CONFIG": "global_test.yaml"
     });
-    test.stdout.expect(never(contains("dart:isolate-patch")));
-    test.shouldExit(1);
+    expect(test.stdout, neverEmits(contains("dart:isolate-patch")));
+    await test.shouldExit(1);
   });
 
   group("disallows local-only configuration:", () {
     for (var field in ["skip", "test_on", "paths", "filename", "names",
         "plain_names", "include_tags", "exclude_tags", "pub_serve", "tags",
         "add_tags"]) {
-      test("rejects local-only configuration", () {
-        d.file("global_test.yaml", JSON.encode({field: null})).create();
+      test("rejects local-only configuration", () async {
+        await d.file("global_test.yaml", JSON.encode({field: null})).create();
 
-        d.file("test.dart", """
+        await d.file("test.dart", """
           import 'package:test/test.dart';
 
           void main() {
@@ -114,14 +111,14 @@ void main() {
           }
         """).create();
 
-        var test = runTest(["test.dart"], environment: {
+        var test = await runTest(["test.dart"], environment: {
           "DART_TEST_CONFIG": "global_test.yaml"
         });
-        test.stderr.expect(containsInOrder([
+        expect(test.stderr, containsInOrder([
           "of global_test.yaml: $field isn't supported here.",
           "^^"
         ]));
-        test.shouldExit(exit_codes.data);
+        await test.shouldExit(exit_codes.data);
       });
     }
   });
